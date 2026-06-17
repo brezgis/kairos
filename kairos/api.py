@@ -76,7 +76,7 @@ def index():
     if not path.exists():
         return HTMLResponse("<h1>Kairos</h1><p>Frontend not installed. API at <a href='/docs'>/docs</a>.</p>")
     html = path.read_text(encoding="utf-8")
-    tag = '<script src="/kairos-sync.js"></script>'
+    tag = '<script src="/kairos-sync.js?v=2"></script>'
     if tag not in html:
         html = html.replace("</body>", tag + "</body>", 1)
     return HTMLResponse(html)

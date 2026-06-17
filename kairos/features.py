@@ -40,6 +40,11 @@ NUMERIC_SOURCES = {
 
 WINDOW_SHORT, WINDOW_LONG = 7, 30
 
+# Astronomically/calendar-deterministic metrics: kept as context but never
+# flagged as "notable" — their trailing z-score just tracks the seasonal ramp,
+# not a real anomaly (e.g. daylight is fixed by date + latitude).
+DETERMINISTIC = {"daylight_h"}
+
 
 def _load_series(conn) -> dict:
     series = {}
@@ -110,7 +115,8 @@ def daily_brief(conn, day: str | None = None) -> dict:
     row = conn.execute("SELECT data FROM features_daily WHERE day = ?", (day,)).fetchone()
     feats = json.loads(row[0]) if row else {}
     notable = sorted(
-        ((n, f) for n, f in feats.items() if isinstance(f, dict) and abs(f.get("z30", 0)) >= 1.0),
+        ((n, f) for n, f in feats.items()
+         if n not in DETERMINISTIC and isinstance(f, dict) and abs(f.get("z30", 0)) >= 1.0),
         key=lambda kv: abs(kv[1]["z30"]), reverse=True)
     active_insights = []
     ins = conn.execute("SELECT value FROM app_state WHERE key='kairos:insights'").fetchone()

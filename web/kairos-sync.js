@@ -3,6 +3,15 @@
 // Captures all `kairos:*` localStorage keys (insights, prefs, per-day check-ins)
 // and POSTs them to /sync so they persist in SQLite.
 (function () {
+  // One-shot reset: open /?reset=1 to wipe local Kairos data (no console needed).
+  if (location.search.indexOf("reset=1") !== -1) {
+    Object.keys(localStorage)
+      .filter(function (k) { return k.indexOf("kairos:") === 0; })
+      .forEach(function (k) { localStorage.removeItem(k); });
+    location.replace("/");
+    return;
+  }
+
   function collect() {
     var out = {};
     for (var i = 0; i < localStorage.length; i++) {
