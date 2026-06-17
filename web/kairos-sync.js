@@ -12,6 +12,30 @@
     return;
   }
 
+  // Oracle bridge: provide window.claude.complete so the app's generateOracle()
+  // routes through the Kairos backend (agent-generate: Claude Code -> Qwopus).
+  if (!window.claude) window.claude = {};
+  if (!window.claude.complete) {
+    window.claude.complete = function (prompt) {
+      var d = new Date();
+      var day = d.getFullYear() + "-" +
+        String(d.getMonth() + 1).padStart(2, "0") + "-" +
+        String(d.getDate()).padStart(2, "0");
+      // the app stores the day's entry under a non-zero-padded key (kairos:YYYY-M-D)
+      var dKey = "kairos:" + d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+      var entry = null;
+      try { entry = JSON.parse(localStorage.getItem(dKey) || "null"); } catch (e) {}
+      return fetch("/oracle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ day: day, prompt: prompt, entry: entry }),
+      }).then(function (r) {
+        if (!r.ok) throw new Error("oracle " + r.status);
+        return r.json();
+      }).then(function (j) { return j.text; });
+    };
+  }
+
   function collect() {
     var out = {};
     for (var i = 0; i < localStorage.length; i++) {

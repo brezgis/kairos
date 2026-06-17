@@ -13,8 +13,9 @@ import re
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
-from . import db, features
+from . import db, features, oracle
 from .config import ROOT
 
 WEB_DIR = ROOT / "web"
@@ -76,7 +77,7 @@ def index():
     if not path.exists():
         return HTMLResponse("<h1>Kairos</h1><p>Frontend not installed. API at <a href='/docs'>/docs</a>.</p>")
     html = path.read_text(encoding="utf-8")
-    tag = '<script src="/kairos-sync.js?v=2"></script>'
+    tag = '<script src="/kairos-sync.js?v=4"></script>'
     if tag not in html:
         html = html.replace("</body>", tag + "</body>", 1)
     return HTMLResponse(html)
@@ -132,6 +133,31 @@ def brief(day: str | None = None):
         return features.daily_brief(conn, day)
     finally:
         conn.close()
+
+
+class OracleReq(BaseModel):
+    day: str | None = None
+    force: bool = False
+    prompt: str | None = None   # the app's prompt (ignored — we build from real data)
+    entry: dict | None = None   # the day's localStorage entry (fresh check-in)
+
+
+@app.post("/oracle")
+def oracle_endpoint(req: OracleReq):
+    """Generate (or return cached) the day's reading, as the LINE:/LETTER: text the
+    app's parseOracle() expects. Sync def → runs in a threadpool so the
+    agent-generate subprocess doesn't block the event loop."""
+    day = req.day or dt.date.today().isoformat()
+    morning, force = None, req.force
+    if req.entry:
+        morning = req.entry.get("morning") or req.entry
+        force = True  # the app just submitted a check-in → regenerate with it
+    conn = db.connect()
+    try:
+        r = oracle.generate(day, conn, force=force, morning=morning)
+    finally:
+        conn.close()
+    return {"text": f"LINE: {r['line']}\nLETTER: {r['letter']}", "line": r["line"], "letter": r["letter"]}
 
 
 # Serve /kairos-sync.js and any other assets from web/. The explicit "/" route

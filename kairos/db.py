@@ -123,6 +123,14 @@ CREATE TABLE IF NOT EXISTS calendar_events (
     fetched_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_cal_day ON calendar_events(day);
+
+CREATE TABLE IF NOT EXISTS oracle (
+    day        TEXT PRIMARY KEY,
+    line       TEXT,
+    letter     TEXT,
+    source     TEXT,
+    created_at TEXT NOT NULL
+);
 """
 
 
