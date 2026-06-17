@@ -1,5 +1,7 @@
 # Kairos backend dependencies.
-# The ingesters (Oura, weather, Spotify) use only the Python standard library.
-# The API layer needs:
+# Most ingesters (Oura, weather, Spotify) use only the Python standard library.
+# The API layer and the calendar ingester need:
 fastapi
 uvicorn[standard]
+icalendar
+recurring-ical-events

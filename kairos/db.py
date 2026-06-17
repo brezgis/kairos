@@ -102,6 +102,27 @@ CREATE TABLE IF NOT EXISTS daily_checkin (
     data       TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS features_daily (
+    day         TEXT PRIMARY KEY,
+    data        TEXT NOT NULL,
+    computed_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS calendar_events (
+    id           TEXT PRIMARY KEY,
+    calendar     TEXT,
+    day          TEXT,
+    start        TEXT,
+    end          TEXT,
+    summary      TEXT,
+    location     TEXT,
+    all_day      INTEGER,
+    duration_min INTEGER,
+    data         TEXT NOT NULL,
+    fetched_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_cal_day ON calendar_events(day);
 """
 
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import datetime as dt
 
-from . import ingest_oura, ingest_weather
+from . import db, features, ingest_oura, ingest_weather
 from .config import cfg
 
 
@@ -33,6 +33,19 @@ def main() -> None:
         print(f"   {ingest_spotify.run()}")
     else:
         print("== Spotify: skipped (no SPOTIFY_REFRESH_TOKEN in .env) ==")
+
+    if cfg("KAIROS_CALENDARS"):
+        print("== Calendar ==")
+        from . import ingest_calendar
+        n = ingest_calendar.run(today - dt.timedelta(days=30), today + dt.timedelta(days=30))
+        print(f"   event instances upserted: {n}")
+    else:
+        print("== Calendar: skipped (no KAIROS_CALENDARS in .env) ==")
+
+    print("== Features ==")
+    conn = db.connect()
+    print(f"   computed {features.write(conn, features.compute(conn))} day(s)")
+    conn.close()
 
 
 if __name__ == "__main__":

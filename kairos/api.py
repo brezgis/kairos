@@ -14,7 +14,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import db
+from . import db, features
 from .config import ROOT
 
 WEB_DIR = ROOT / "web"
@@ -35,7 +35,8 @@ def summary():
             "SELECT endpoint, count(*) FROM oura_records GROUP BY endpoint ORDER BY endpoint")}
         w = conn.execute("SELECT count(*), min(day), max(day) FROM weather_daily").fetchone()
         plays = conn.execute("SELECT count(*) FROM spotify_plays").fetchone()[0]
-        checkins = conn.execute("SELECT count(*) FROM checkins").fetchone()[0]
+        checkins = conn.execute("SELECT count(*) FROM daily_checkin").fetchone()[0]
+        feats = conn.execute("SELECT count(*) FROM features_daily").fetchone()[0]
     finally:
         conn.close()
     return {
@@ -43,6 +44,7 @@ def summary():
         "weather": {"days": w[0], "from": w[1], "to": w[2]},
         "spotify_plays": plays,
         "checkins": checkins,
+        "features_days": feats,
     }
 
 
@@ -120,6 +122,16 @@ def insights():
     finally:
         conn.close()
     return json.loads(row[0]) if row else {}
+
+
+@app.get("/brief")
+def brief(day: str | None = None):
+    """The curated daily oracle brief: features, baselines, and notable deltas."""
+    conn = db.connect()
+    try:
+        return features.daily_brief(conn, day)
+    finally:
+        conn.close()
 
 
 # Serve /kairos-sync.js and any other assets from web/. The explicit "/" route
