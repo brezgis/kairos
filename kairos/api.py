@@ -10,9 +10,12 @@ import datetime as dt
 import json
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from . import db
+from .config import ROOT
+
+WEB_DIR = ROOT / "web"
 
 app = FastAPI(title="Kairos", version="0.1.0")
 
@@ -59,12 +62,8 @@ async def checkin(request: Request):
     return {"ok": True, "day": day, "stored_fields": list(payload.keys())}
 
 
-@app.get("/", response_class=HTMLResponse)
-def index():
-    return (
-        "<html><body style='font-family:system-ui;margin:3rem;max-width:40rem'>"
-        "<h1>Kairos</h1><p>Backend is running. Your check-in form will live here.</p>"
-        "<p>Endpoints: <a href='/summary'>/summary</a> · "
-        "<a href='/health'>/health</a> · <code>POST /checkin</code> · "
-        "<a href='/docs'>/docs</a></p></body></html>"
-    )
+# Serve the bundled frontend (web/index.html) at / plus any static assets.
+# Mounted last so the API routes above take precedence; guarded so the API
+# still boots in a checkout without the frontend present.
+if WEB_DIR.exists():
+    app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="web")
