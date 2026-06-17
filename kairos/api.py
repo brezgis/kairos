@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import re
 
 from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import db
@@ -62,8 +64,66 @@ async def checkin(request: Request):
     return {"ok": True, "day": day, "stored_fields": list(payload.keys())}
 
 
-# Serve the bundled frontend (web/index.html) at / plus any static assets.
-# Mounted last so the API routes above take precedence; guarded so the API
-# still boots in a checkout without the frontend present.
+@app.get("/", response_class=HTMLResponse)
+def index():
+    """Serve the Claude Design bundle with the sync bridge injected.
+
+    The file on disk is never modified — we inject the <script> tag at serve time.
+    """
+    path = WEB_DIR / "index.html"
+    if not path.exists():
+        return HTMLResponse("<h1>Kairos</h1><p>Frontend not installed. API at <a href='/docs'>/docs</a>.</p>")
+    html = path.read_text(encoding="utf-8")
+    tag = '<script src="/kairos-sync.js"></script>'
+    if tag not in html:
+        html = html.replace("</body>", tag + "</body>", 1)
+    return HTMLResponse(html)
+
+
+@app.post("/sync")
+async def sync(request: Request):
+    """Receive the app's localStorage (kairos:* keys) and persist it.
+
+    Mirrors every key into app_state, and normalizes per-day entries
+    (kairos:YYYY-M-D, non-zero-padded) into daily_checkin keyed by ISO day.
+    """
+    payload = await request.json()
+    entries = payload.get("entries", payload)
+    now = dt.datetime.now(dt.timezone.utc).isoformat()
+    days = 0
+    conn = db.connect()
+    try:
+        for key, value in entries.items():
+            value = value if isinstance(value, str) else json.dumps(value)
+            conn.execute(
+                "INSERT OR REPLACE INTO app_state(key, value, updated_at) VALUES (?, ?, ?)",
+                (key, value, now))
+            m = re.match(r"^kairos:(\d{4})-(\d{1,2})-(\d{1,2})$", key)
+            if m:
+                day = f"{int(m.group(1)):04d}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
+                conn.execute(
+                    "INSERT OR REPLACE INTO daily_checkin(day, data, updated_at) VALUES (?, ?, ?)",
+                    (day, value, now))
+                days += 1
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True, "keys": len(entries), "days": days}
+
+
+@app.get("/insights")
+def insights():
+    """Return the stored insights blob (what the app reads as kairos:insights)."""
+    conn = db.connect()
+    try:
+        row = conn.execute("SELECT value FROM app_state WHERE key = 'kairos:insights'").fetchone()
+    finally:
+        conn.close()
+    return json.loads(row[0]) if row else {}
+
+
+# Serve /kairos-sync.js and any other assets from web/. The explicit "/" route
+# above injects the sync bridge; this mount handles everything else.
+# Guarded so the API still boots without the frontend present.
 if WEB_DIR.exists():
     app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="web")
