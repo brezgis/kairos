@@ -1,6 +1,7 @@
 # Secrets & credentials — never commit these (repo is public)
 .env
 .env.*
+!.env.example
 *.env
 secrets.json
 *.secret
