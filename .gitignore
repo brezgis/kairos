@@ -1,0 +1,38 @@
+# Secrets & credentials — never commit these (repo is public)
+.env
+.env.*
+*.env
+secrets.json
+*.secret
+tokens.json
+*_token*.json
+
+# Personal data stores — keep health data out of the repo
+data/
+*.sqlite
+*.sqlite3
+*.db
+*.duckdb
+*.csv
+*.parquet
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.python-version
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Logs
+*.log
