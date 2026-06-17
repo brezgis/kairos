@@ -1,0 +1,5 @@
+# Kairos backend dependencies.
+# The ingesters (Oura, weather, Spotify) use only the Python standard library.
+# The API layer needs:
+fastapi
+uvicorn[standard]
