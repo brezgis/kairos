@@ -18,14 +18,11 @@ from . import db, oracle
 def main() -> None:
     p = argparse.ArgumentParser(description="Generate the daily oracle reading.")
     p.add_argument("--day", default=dt.date.today().isoformat())
-    p.add_argument("--no-force", action="store_true", help="use cached reading if present")
     args = p.parse_args()
-    conn = db.connect()
-    r = oracle.generate(args.day, conn, force=not args.no_force)
-    conn.close()
-    print(f"[{args.day}] {'(cached)' if r.get('cached') else 'generated'}")
-    print("LINE:  ", r["line"])
-    print("LETTER:", r["letter"])
+    r = oracle.generate_now(args.day)
+    print(f"[{args.day}] {r['state']}")
+    print("TITLE:", r["title"])
+    print("TEXT: ", r["text"])
 
 
 if __name__ == "__main__":

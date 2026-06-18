@@ -10,12 +10,12 @@ import datetime as dt
 import json
 import re
 
-from fastapi import FastAPI, Request
+from fastapi import Body, FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import db, features, oracle
+from . import db, features, oracle, views
 from .config import ROOT
 
 WEB_DIR = ROOT / "web"
@@ -69,18 +69,11 @@ async def checkin(request: Request):
 
 @app.get("/", response_class=HTMLResponse)
 def index():
-    """Serve the Claude Design bundle with the sync bridge injected.
-
-    The file on disk is never modified — we inject the <script> tag at serve time.
-    """
+    """Serve the Claude Design frontend (it talks to /api/* directly — no injection)."""
     path = WEB_DIR / "index.html"
     if not path.exists():
         return HTMLResponse("<h1>Kairos</h1><p>Frontend not installed. API at <a href='/docs'>/docs</a>.</p>")
-    html = path.read_text(encoding="utf-8")
-    tag = '<script src="/kairos-sync.js?v=4"></script>'
-    if tag not in html:
-        html = html.replace("</body>", tag + "</body>", 1)
-    return HTMLResponse(html)
+    return HTMLResponse(path.read_text(encoding="utf-8"))
 
 
 @app.post("/sync")
@@ -135,29 +128,75 @@ def brief(day: str | None = None):
         conn.close()
 
 
-class OracleReq(BaseModel):
-    day: str | None = None
-    force: bool = False
-    prompt: str | None = None   # the app's prompt (ignored — we build from real data)
-    entry: dict | None = None   # the day's localStorage entry (fresh check-in)
-
-
-@app.post("/oracle")
-def oracle_endpoint(req: OracleReq):
-    """Generate (or return cached) the day's reading, as the LINE:/LETTER: text the
-    app's parseOracle() expects. Sync def → runs in a threadpool so the
-    agent-generate subprocess doesn't block the event loop."""
-    day = req.day or dt.date.today().isoformat()
-    morning, force = None, req.force
-    if req.entry:
-        morning = req.entry.get("morning") or req.entry
-        force = True  # the app just submitted a check-in → regenerate with it
+# ─── Frontend API (/api/*) — the contract the new bundle calls ───────────────
+@app.get("/api/prefs")
+def api_get_prefs():
     conn = db.connect()
     try:
-        r = oracle.generate(day, conn, force=force, morning=morning)
+        return views.get_prefs(conn)
     finally:
         conn.close()
-    return {"text": f"LINE: {r['line']}\nLETTER: {r['letter']}", "line": r["line"], "letter": r["letter"]}
+
+
+@app.put("/api/prefs")
+def api_put_prefs(prefs: dict = Body(...)):
+    conn = db.connect()
+    try:
+        return views.save_prefs(conn, prefs)
+    finally:
+        conn.close()
+
+
+@app.get("/api/day/{day}")
+def api_get_day(day: str):
+    conn = db.connect()
+    try:
+        return views.get_day(conn, views.norm_day(day))
+    finally:
+        conn.close()
+
+
+class CheckinReq(BaseModel):
+    phase: str
+    fields: dict = {}
+
+
+@app.post("/api/day/{day}/checkin")
+def api_checkin(day: str, req: CheckinReq):
+    conn = db.connect()
+    try:
+        return views.save_checkin(conn, views.norm_day(day), req.phase, req.fields)
+    finally:
+        conn.close()
+
+
+@app.post("/api/day/{day}/oracle")
+def api_oracle(day: str):
+    # background generation — returns {state,title,text}; frontend polls /api/day
+    return oracle.request(views.norm_day(day))
+
+
+@app.get("/api/history")
+def api_history(days: int = 60):
+    conn = db.connect()
+    try:
+        return views.history(conn, days)
+    finally:
+        conn.close()
+
+
+@app.get("/api/insights")
+def api_insights():
+    return []  # Oracle-Lab not built yet — empty until it discovers patterns
+
+
+@app.get("/api/sources")
+def api_sources():
+    conn = db.connect()
+    try:
+        return views.sources(conn)
+    finally:
+        conn.close()
 
 
 # Serve /kairos-sync.js and any other assets from web/. The explicit "/" route

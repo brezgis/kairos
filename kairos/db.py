@@ -126,10 +126,11 @@ CREATE INDEX IF NOT EXISTS idx_cal_day ON calendar_events(day);
 
 CREATE TABLE IF NOT EXISTS oracle (
     day        TEXT PRIMARY KEY,
-    line       TEXT,
-    letter     TEXT,
+    state      TEXT NOT NULL DEFAULT 'none',
+    title      TEXT,
+    text       TEXT,
     source     TEXT,
-    created_at TEXT NOT NULL
+    created_at TEXT
 );
 """
 
