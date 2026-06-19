@@ -41,4 +41,4 @@ connected applications).
 
 ## Contact
 
-contact@example.com
+Open an issue on the project's GitHub repository.

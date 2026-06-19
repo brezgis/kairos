@@ -30,4 +30,4 @@ arising from the use of this project.
 
 ## Contact
 
-contact@example.com
+Open an issue on the project's GitHub repository.

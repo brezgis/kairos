@@ -25,7 +25,6 @@ SNAP_FILES = (SNAPSHOT, Path(f"{SNAPSHOT}-wal"), Path(f"{SNAPSHOT}-shm"))
 CLAUDE = Path(os.path.expanduser("~/.local/bin/claude"))
 VENV_PY = ROOT / ".venv" / "bin" / "python"
 MODEL = "claude-sonnet-4-6"
-LAB_PATH = "/home/user/.local/bin:/home/user/.nvm/versions/node/v22.22.0/bin:/usr/local/bin:/usr/bin:/bin"
 
 
 def _prompt() -> str:
@@ -97,7 +96,8 @@ def run() -> dict:
     _snapshot()
     if FINDINGS.exists():
         FINDINGS.unlink()
-    env = {**os.environ, "PATH": LAB_PATH}
+    env = {**os.environ}
+    env["PATH"] = os.pathsep.join([os.path.expanduser("~/.local/bin"), env.get("PATH", "")])
     proc = subprocess.run(
         [str(CLAUDE), "-p", _prompt(), "--model", MODEL,
          "--permission-mode", "bypassPermissions",

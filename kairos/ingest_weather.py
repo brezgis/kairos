@@ -4,8 +4,8 @@ Usage (from the repo root):
     python3 -m kairos.ingest_weather                # last ~92 days through today
     python3 -m kairos.ingest_weather --past-days 30
 
-Location comes from KAIROS_LAT / KAIROS_LON / KAIROS_TZ in .env, defaulting to
-New York, NY.
+Location comes from KAIROS_LAT / KAIROS_LON / KAIROS_TZ in .env (set these to
+your own coordinates; the code defaults are a generic placeholder).
 """
 
 from __future__ import annotations
