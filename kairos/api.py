@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import db, features, oracle, views
+from . import db, features, insights, oracle, views
 from .config import ROOT
 
 WEB_DIR = ROOT / "web"
@@ -108,7 +108,7 @@ async def sync(request: Request):
 
 
 @app.get("/insights")
-def insights():
+def legacy_insights():
     """Return the stored insights blob (what the app reads as kairos:insights)."""
     conn = db.connect()
     try:
@@ -187,7 +187,11 @@ def api_history(days: int = 60):
 
 @app.get("/api/insights")
 def api_insights():
-    return []  # Oracle-Lab not built yet — empty until it discovers patterns
+    conn = db.connect()
+    try:
+        return insights.active(conn)
+    finally:
+        conn.close()
 
 
 @app.get("/api/sources")

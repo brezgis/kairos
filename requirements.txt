@@ -6,3 +6,8 @@ uvicorn[standard]
 icalendar
 recurring-ical-events
 caldav
+
+# The Oracle-Lab's analysis scripts use:
+pandas
+numpy
+scipy

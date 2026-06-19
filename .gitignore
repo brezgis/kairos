@@ -14,6 +14,9 @@ oracle_memory.md
 
 # Personal data stores — keep health data out of the repo
 data/
+
+# Oracle-Lab workspace (DB snapshot, notebook, findings, scratch scripts — private)
+lab/
 *.sqlite
 *.sqlite3
 *.db

@@ -132,6 +132,22 @@ CREATE TABLE IF NOT EXISTS oracle (
     source     TEXT,
     created_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS insights (
+    id          TEXT PRIMARY KEY,
+    status      TEXT NOT NULL DEFAULT 'candidate',  -- candidate | active | archived
+    title       TEXT,
+    stat        TEXT,
+    detail      TEXT,
+    confidence  REAL,
+    evidence    TEXT,                               -- JSON: n, effect, p, method, controls
+    since       TEXT,
+    seen_count  INTEGER DEFAULT 0,
+    first_seen  TEXT,
+    last_seen   TEXT,
+    last_run    TEXT,
+    updated_at  TEXT
+);
 """
 
 
