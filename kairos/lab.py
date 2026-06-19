@@ -11,7 +11,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
-import shutil
+import sqlite3
 import subprocess
 from pathlib import Path
 
@@ -21,6 +21,7 @@ from .config import ROOT
 LAB = ROOT / "lab"
 SNAPSHOT = LAB / "snapshot.db"
 FINDINGS = LAB / "findings.json"
+SNAP_FILES = (SNAPSHOT, Path(f"{SNAPSHOT}-wal"), Path(f"{SNAPSHOT}-shm"))
 CLAUDE = Path(os.path.expanduser("~/.local/bin/claude"))
 VENV_PY = ROOT / ".venv" / "bin" / "python"
 MODEL = "claude-sonnet-4-6"
@@ -64,10 +65,36 @@ def _prompt() -> str:
     )
 
 
+def _snapshot() -> None:
+    """Write a consistent, WAL-safe read-only snapshot of the live DB.
+
+    shutil.copyfile of a WAL-mode DB can miss pages still in the -wal and leaves
+    orphan sidecars; the sqlite backup API produces a clean single-file copy.
+    """
+    _cleanup_snapshot()
+    src = sqlite3.connect(f"file:{db.DB_PATH}?mode=ro", uri=True)
+    dst = sqlite3.connect(str(SNAPSHOT))
+    try:
+        with dst:
+            src.backup(dst)
+        dst.execute("PRAGMA journal_mode=DELETE")   # no -wal/-shm when the agent reads it
+    finally:
+        src.close()
+        dst.close()
+
+
+def _cleanup_snapshot() -> None:
+    for p in SNAP_FILES:
+        try:
+            p.unlink()
+        except OSError:
+            pass
+
+
 def run() -> dict:
     LAB.mkdir(exist_ok=True)
     (LAB / "scripts").mkdir(exist_ok=True)
-    shutil.copyfile(db.DB_PATH, SNAPSHOT)   # fresh read-only working copy
+    _snapshot()
     if FINDINGS.exists():
         FINDINGS.unlink()
     env = {**os.environ, "PATH": LAB_PATH}
@@ -91,10 +118,7 @@ def run() -> dict:
         n_active = len(insights.active(conn))
     finally:
         conn.close()
-    try:
-        SNAPSHOT.unlink()   # don't leave a copy of the health DB lying around
-    except OSError:
-        pass
+    _cleanup_snapshot()   # don't leave a copy of the health DB lying around
     return {"rc": proc.returncode, "findings": len(findings),
             "reported": res["reported"], "active": n_active}
 
