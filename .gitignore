@@ -8,6 +8,10 @@ secrets.json
 tokens.json
 *_token*.json
 
+# Personal bio + oracle memory (private — this repo is public)
+bio.md
+oracle_memory.md
+
 # Personal data stores — keep health data out of the repo
 data/
 *.sqlite

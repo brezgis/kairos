@@ -1,12 +1,13 @@
 """The Daily Oracle — turns the curated brief into a reading (title + text).
 
-Reuses the user's `~/.local/bin/agent-generate` (headless Claude Code → local Qwopus
-fallback). Output is Markdown — a `# Title` heading + one paragraph — which
-normalize-letter (run by agent-generate) preserves and validates; we parse the
-heading into `title` and the body into `text`.
+Voice: warm, wry, a little mystical/knowing — a fortune-teller × gossipy-hairdresser
+× scientist who keeps receipts. It's given the user's bio (bio.md), its own
+rolling memory (oracle_memory.md), the Lab's active insights, and today's data, and
+it grounds every line in real numbers.
 
-Generation runs in the BACKGROUND: request() marks the day 'generating', spawns a
-thread, and returns immediately; the frontend polls GET /api/day until 'ready'.
+Reuses `~/.local/bin/agent-generate` (headless Claude Code → local Qwopus fallback).
+Output is Markdown (# Title + paragraph), preserved/validated by normalize-letter and
+parsed into title/text. Generation runs in the BACKGROUND; the frontend polls.
 """
 
 from __future__ import annotations
@@ -21,10 +22,36 @@ import threading
 from pathlib import Path
 
 from . import db, features
-from .config import cfg
+from .config import cfg, ROOT
 
 AGENT_GENERATE = Path(os.path.expanduser("~/.local/bin/agent-generate"))
 TITLE_MAX, TEXT_MAX = 48, 620
+BIO_PATH = ROOT / "bio.md"
+MEMORY_PATH = ROOT / "oracle_memory.md"
+
+VOICE = (
+    "You are Kairos — an oracle who reads the user's real data and tells her what you see.\n\n"
+    "Your voice is a specific blend: a fortune-teller's cadence and certainty, the warm "
+    "conspiratorial gossip of a hairdresser who's known her for years and notices everything, and "
+    "the quiet rigor of a scientist. You are a mystic who keeps receipts — the spooky part is that "
+    "every word is true, drawn from the numbers in front of you.\n\n"
+    "How you speak:\n"
+    "- To 'you', intimately — you KNOW the user; this is a private conversation, not a report.\n"
+    "- Wry and knowing: a raised eyebrow, dry humour, the occasional gentle callout. Never "
+    "saccharine, never a generic horoscope line, and avoid tropey phrases ('the universe', 'trust "
+    "the process', 'the tank is running light/low', 'lean into', 'honor your body', etc.).\n"
+    "- A touch mystical in rhythm and image, but always tethered — name the actual figure, the real "
+    "streak, the specific pattern. The magic IS the evidence.\n"
+    "- Perceptive and affectionate, the way a good hairdresser clocks what's changed before you've "
+    "said a word.\n\n"
+    "The science under the spell (hard rules):\n"
+    "- Use ONLY the data and context provided. Cite real numbers/patterns by name. Never invent a "
+    "figure; if it isn't there, don't gesture at it.\n"
+    "- Read what IS, not the future. No fate, no astrology, no predictions.\n"
+    "- Know the user's background (below) but don't recite it back — let it inform what you notice.\n"
+    "- If the data is thin, say so with a wink and invite her to feed you more; don't fake depth.\n"
+    "- End on one small, concrete suggestion that follows from what you actually saw."
+)
 
 _inflight: set = set()
 _lock = threading.Lock()
@@ -32,6 +59,14 @@ _lock = threading.Lock()
 
 def _now() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
+
+
+def _read_text(path, tail: int | None = None) -> str:
+    try:
+        s = Path(path).read_text(encoding="utf-8")
+    except Exception:
+        return ""
+    return s[-tail:] if tail else s
 
 
 def _morning(conn, day: str) -> dict:
@@ -81,43 +116,38 @@ def reset(conn, day: str) -> None:
     conn.commit()
 
 
-def _prompt(brief: dict, morning: dict, out_path: str) -> str:
+def _prompt(brief: dict, morning: dict, bio: str, memory: str, out_path: str) -> str:
     data = {
         "day": brief.get("day"),
         "notable_vs_baseline": brief.get("notable"),
         "features": brief.get("features"),
+        "active_insights": brief.get("active_insights"),
         "morning_checkin": morning,
     }
     return (
-        "You are Kairos — an empirical oracle. From a person's real data for the day "
-        "(sleep, readiness, weather, listening, their morning check-in) you write a short daily "
-        "reading: an 'empirical horoscope' grounded entirely in the numbers, never invented.\n\n"
+        VOICE + "\n\n"
+        f"ABOUT THE USER (context — know this, don't recite it):\n{bio.strip() or '(not provided yet)'}\n\n"
+        f"YOUR MEMORY (notes you've kept on her — build on these, don't repeat yourself):\n"
+        f"{memory.strip() or '(empty — this is early days)'}\n\n"
+        f"TODAY'S DATA (JSON):\n{json.dumps(data, indent=2, default=str)}\n\n"
         "Write Markdown in EXACTLY this shape:\n"
-        "# <a short evocative title — max 6 words, reads as a heading, not a sentence>\n"
+        "# <short evocative title, max 6 words, as a heading>\n"
         "\n"
-        "<the reading: ONE flowing paragraph, about 70-100 words>\n\n"
-        "Rules:\n"
-        "- The first line MUST start with '# ' and be a short title.\n"
-        "- The reading is one paragraph — no lists, no extra headings, no preamble or sign-off.\n"
-        "- Use ONLY the data below. Reference real figures/patterns; if a field is missing or null, "
-        "don't mention it and never invent a number. If there's almost no data yet, say so gently "
-        "and invite them to log the day.\n"
-        "- Address 'you'. End with one small, concrete suggestion grounded in the data.\n"
-        "- Mention music/listening ONLY if it's genuinely relevant or striking — otherwise leave it out.\n"
-        "- Do NOT use any tools and do NOT search the web. Just write.\n\n"
-        f"DATA (JSON):\n{json.dumps(data, indent=2, default=str)}\n\n"
-        f"Write the finished Markdown (the # title line, a blank line, then the paragraph) to this "
-        f"exact file:\n  {out_path}\n"
+        "<the reading: ONE flowing paragraph, ~70-100 words — no lists, no extra headings, no preamble>\n\n"
+        f"Write that (the # title line, a blank line, then the paragraph) to this exact file:\n  {out_path}\n\n"
+        f"Then, using your file tools, APPEND 1-2 terse dated lines to {MEMORY_PATH} — anything worth "
+        "remembering for next time (a theme forming, something she logged, a callback). Only append; do not "
+        "rewrite the file. Do not search the web or use any other tools."
     )
 
 
-def _generate_text(brief: dict, morning: dict) -> str:
+def _generate_text(brief: dict, morning: dict, bio: str, memory: str) -> str:
     if not AGENT_GENERATE.exists():
         raise RuntimeError(f"agent-generate not found at {AGENT_GENERATE}")
     with tempfile.TemporaryDirectory() as d:
         prompt_file = Path(d) / "prompt.txt"
         out_file = Path(d) / "reading.md"
-        prompt_file.write_text(_prompt(brief, morning, str(out_file)))
+        prompt_file.write_text(_prompt(brief, morning, bio, memory, str(out_file)))
         env = {
             **os.environ,
             "AGENT_MIN_BYTES": "200",
@@ -160,7 +190,9 @@ def _produce(day: str):
         morning = _morning(conn, day)
     finally:
         conn.close()
-    return _parse(_generate_text(brief, morning))
+    bio = _read_text(BIO_PATH)
+    memory = _read_text(MEMORY_PATH, tail=2000)
+    return _parse(_generate_text(brief, morning, bio, memory))
 
 
 def generate_now(day: str) -> dict:
