@@ -38,7 +38,7 @@ PERSONAL_INFO_URL = "https://api.ouraring.com/v2/usercollection/personal_info"
 
 # Documented Oura scopes. Stress and heart-health (cardiovascular age) data are
 # served under the "daily" scope, so this set covers the full Kairos dataset.
-DEFAULT_SCOPES = "personal daily heartrate workout tag session spo2 heart_health stress"
+DEFAULT_SCOPES = "email personal daily heartrate workout tag session spo2 heart_health stress ring_configuration"
 
 ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 
