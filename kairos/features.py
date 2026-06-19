@@ -129,6 +129,7 @@ def daily_brief(conn, day: str | None = None) -> dict:
         "day": day,
         "streams_present": sorted(feats.keys()),
         "notable": [{"metric": n, **f} for n, f in notable],
+        "values": {n: f.get("v") for n, f in feats.items() if isinstance(f, dict)},
         "features": feats,
         "active_insights": active_insights,
     }
