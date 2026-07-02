@@ -18,22 +18,43 @@ import statistics
 
 from . import db
 
+# The detailed `sleep` endpoint, restricted to the main night, is the source of
+# truth for sleep durations + physiology (HRV, heart rate, breath). The
+# `daily_sleep` doc carries only the score and contributor subscores — its
+# total_sleep_duration/efficiency are absent — so those come from `sleep` too.
+# Naps arrive as type='late_nap' etc.; type='long_sleep' is the night.
+_NIGHT = "FROM oura_records WHERE endpoint='sleep' AND json_extract(data,'$.type')='long_sleep'"
+
 # metric name -> SQL returning rows of (day, numeric value)
 NUMERIC_SOURCES = {
-    "sleep_score":      "SELECT day, json_extract(data,'$.score') FROM oura_records WHERE endpoint='daily_sleep'",
-    "sleep_hours":      "SELECT day, json_extract(data,'$.total_sleep_duration')/3600.0 FROM oura_records WHERE endpoint='daily_sleep'",
-    "sleep_efficiency": "SELECT day, json_extract(data,'$.efficiency') FROM oura_records WHERE endpoint='daily_sleep'",
+    # sleep
+    "sleep_score":       "SELECT day, json_extract(data,'$.score') FROM oura_records WHERE endpoint='daily_sleep'",
+    "sleep_hours":       f"SELECT day, json_extract(data,'$.total_sleep_duration')/3600.0 {_NIGHT}",
+    "sleep_efficiency":  f"SELECT day, json_extract(data,'$.efficiency') {_NIGHT}",
+    "deep_sleep_hours":  f"SELECT day, json_extract(data,'$.deep_sleep_duration')/3600.0 {_NIGHT}",
+    "rem_sleep_hours":   f"SELECT day, json_extract(data,'$.rem_sleep_duration')/3600.0 {_NIGHT}",
+    "light_sleep_hours": f"SELECT day, json_extract(data,'$.light_sleep_duration')/3600.0 {_NIGHT}",
+    "sleep_latency_min": f"SELECT day, json_extract(data,'$.latency')/60.0 {_NIGHT}",
+    # heart + respiration (overnight)
+    "hrv":               f"SELECT day, json_extract(data,'$.average_hrv') {_NIGHT}",
+    "resting_hr":        f"SELECT day, json_extract(data,'$.lowest_heart_rate') {_NIGHT}",
+    "sleep_hr":          f"SELECT day, json_extract(data,'$.average_heart_rate') {_NIGHT}",
+    "avg_breath":        f"SELECT day, json_extract(data,'$.average_breath') {_NIGHT}",
+    # readiness
     "readiness_score":  "SELECT day, json_extract(data,'$.score') FROM oura_records WHERE endpoint='daily_readiness'",
     "temp_deviation":   "SELECT day, json_extract(data,'$.temperature_deviation') FROM oura_records WHERE endpoint='daily_readiness'",
+    # activity
     "activity_score":   "SELECT day, json_extract(data,'$.score') FROM oura_records WHERE endpoint='daily_activity'",
     "steps":            "SELECT day, json_extract(data,'$.steps') FROM oura_records WHERE endpoint='daily_activity'",
     "active_calories":  "SELECT day, json_extract(data,'$.active_calories') FROM oura_records WHERE endpoint='daily_activity'",
+    # weather
     "temp_mean_c":      "SELECT day, temp_mean_c FROM v_weather",
     "temp_max_c":       "SELECT day, temp_max_c FROM v_weather",
     "precip_mm":        "SELECT day, precip_mm FROM v_weather",
     "daylight_h":       "SELECT day, daylight_s/3600.0 FROM v_weather",
     "sunshine_h":       "SELECT day, sunshine_s/3600.0 FROM v_weather",
     "uv_max":           "SELECT day, uv_index_max FROM v_weather",
+    # subjective + listening
     "checkin_energy":   "SELECT day, json_extract(data,'$.morning.energy') FROM daily_checkin",
     "spotify_plays":    "SELECT date(played_at), COUNT(*) FROM spotify_plays GROUP BY date(played_at)",
 }
