@@ -232,8 +232,9 @@ def request(day: str, force: bool = False) -> dict:
         return {"state": "none", "title": "", "text": ""}
     if cur["state"] == "ready" and not force:
         return cur
-    if cur["state"] == "generating":
-        return cur
+    # _inflight (not the DB) decides whether a generation is actually running:
+    # a DB state of 'generating' with nothing in flight means a previous process
+    # died mid-generation (e.g. restart) and the day would otherwise stay stuck.
     with _lock:
         if day in _inflight:
             return {"state": "generating", "title": "", "text": ""}

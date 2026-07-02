@@ -71,6 +71,8 @@ def _get(path: str, params: dict | None = None) -> dict:
             return json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
         raise SpotifyError(f"GET {path} failed (HTTP {e.code}): {e.read().decode(errors='replace')[:200]}")
+    except urllib.error.URLError as e:
+        raise SpotifyError(f"GET {path} failed (network: {e.reason})")
 
 
 def recently_played(limit: int = 50) -> list:

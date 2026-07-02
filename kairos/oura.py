@@ -68,6 +68,8 @@ def _get(path: str, params: dict) -> dict:
             return json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         raise OuraError(f"GET {path} failed (HTTP {e.code}): {e.read().decode(errors='replace')[:300]}")
+    except urllib.error.URLError as e:
+        raise OuraError(f"GET {path} failed (network: {e.reason})")
 
 
 def _paginate(path: str, params: dict):

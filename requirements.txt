@@ -2,10 +2,14 @@
 # Most ingesters (Oura, weather, Spotify) use only the Python standard library.
 # The API layer and the calendar ingesters need:
 fastapi
+pydantic
 uvicorn[standard]
 icalendar
 recurring-ical-events
 caldav
+
+# scripts/make_icons.py (PWA icon generation) needs:
+Pillow
 
 # The Oracle-Lab's analysis scripts use:
 pandas

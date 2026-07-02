@@ -17,12 +17,16 @@ def _now() -> str:
 
 
 def norm_day(day: str) -> str:
-    """Normalize a day key to zero-padded YYYY-MM-DD."""
+    """Normalize a day key to zero-padded YYYY-MM-DD.
+
+    Raises ValueError for anything that isn't a real date, so impossible
+    day keys can't reach the DB (the API maps that to a 422).
+    """
     try:
         return dt.date.fromisoformat(day).isoformat()
     except ValueError:
         y, m, d = day.split("-")
-        return f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
+        return dt.date(int(y), int(m), int(d)).isoformat()
 
 
 # ---- prefs ----------------------------------------------------------------
@@ -104,9 +108,15 @@ def metrics_for_day(conn, day: str) -> dict:
     return {
         "sleep_score": v("sleep_score"),
         "sleep_hours": v("sleep_hours", 2),
+        "sleep_efficiency": v("sleep_efficiency"),
+        "deep_sleep_hours": v("deep_sleep_hours", 2),
+        "rem_sleep_hours": v("rem_sleep_hours", 2),
+        "light_sleep_hours": v("light_sleep_hours", 2),
         "readiness": v("readiness_score"),
-        "hrv": v("hrv"),                  # not computed yet → null
-        "resting_hr": v("resting_hr"),    # not computed yet → null
+        "hrv": v("hrv"),
+        "resting_hr": v("resting_hr"),
+        "sleep_hr": v("sleep_hr", 1),
+        "avg_breath": v("avg_breath", 1),
         "steps": v("steps"),
         "temperature_deviation": v("temp_deviation"),
         "cycle_phase": phase,
@@ -120,6 +130,20 @@ def metrics_for_day(conn, day: str) -> dict:
 
 
 # ---- day + check-in -------------------------------------------------------
+def latest_biometric_day(conn) -> str:
+    """Most recent day with a finalized night (sleep_hours present); falls back
+    to the latest day with any features, then today. Lets Chronos show last
+    night even before today's sleep has finished syncing from Oura."""
+    row = conn.execute(
+        "SELECT day FROM features_daily "
+        "WHERE json_extract(data, '$.sleep_hours.v') IS NOT NULL "
+        "ORDER BY day DESC LIMIT 1").fetchone()
+    if row:
+        return row[0]
+    row = conn.execute("SELECT max(day) FROM features_daily").fetchone()
+    return row[0] if row and row[0] else dt.date.today().isoformat()
+
+
 def get_day(conn, day: str) -> dict:
     row = conn.execute("SELECT data FROM daily_checkin WHERE day = ?", (day,)).fetchone()
     ci = json.loads(row[0]) if row else {}

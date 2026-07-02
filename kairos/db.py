@@ -75,13 +75,6 @@ CREATE VIEW IF NOT EXISTS v_weather AS
          json_extract(data, '$.uv_index_max')        AS uv_index_max
   FROM weather_daily ORDER BY day;
 
-CREATE TABLE IF NOT EXISTS checkins (
-    ts         TEXT PRIMARY KEY,
-    day        TEXT,
-    data       TEXT NOT NULL,
-    created_at TEXT NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS spotify_plays (
     played_at  TEXT PRIMARY KEY,
     track_id   TEXT,
@@ -151,11 +144,19 @@ CREATE TABLE IF NOT EXISTS insights (
 """
 
 
+_schema_ready = False
+
+
 def connect() -> sqlite3.Connection:
+    global _schema_ready
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA journal_mode=WAL;")
-    conn.executescript(SCHEMA)
+    if not _schema_ready:
+        # The schema is all IF NOT EXISTS DDL — one pass per process is enough,
+        # and the API opens a connection per request.
+        conn.executescript(SCHEMA)
+        _schema_ready = True
     return conn
 
 
