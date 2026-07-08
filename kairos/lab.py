@@ -27,7 +27,14 @@ VENV_PY = ROOT / ".venv" / "bin" / "python"
 MODEL = "claude-sonnet-4-6"
 
 
-def _prompt() -> str:
+def _catalog_block(catalog: list) -> str:
+    if not catalog:
+        return "None yet — you are establishing the first insights.\n"
+    lines = [f"  - {c['id']}  ({c['status']}): {c['title']}" for c in catalog]
+    return "\n".join(lines) + "\n"
+
+
+def _prompt(catalog: list | None = None) -> str:
     return (
         "You are the Oracle-Lab — the analytical engine behind Kairos. Each run, mine the user's "
         "personal data for DURABLE, evidence-backed patterns ('insights') the Oracle and the user can "
@@ -50,6 +57,9 @@ def _prompt() -> str:
         "exercise, calendar load). CONTROL for cycle phase and season. Use effect size + "
         "significance, not raw correlation. Mind multiple comparisons. Favor patterns that recur.\n"
         "4. Write findings.json — a JSON array (use [] if nothing clears the bar). Each item:\n"
+        "   IMPORTANT — reuse an EXISTING slug below if your finding is the same pattern (even if you'd "
+        "phrase the title differently); only coin a new slug for a genuinely new pattern. Existing insights:\n"
+        f"{_catalog_block(catalog or [])}"
         '   {"id": "stable-slug (reuse the SAME slug for the same pattern across runs)",\n'
         '    "title": "short, human",\n'
         "    \"stat\": \"evidence in a phrase, e.g. '-38 min sleep, 4 of 5 weeks'\",\n"
@@ -96,10 +106,15 @@ def run() -> dict:
     _snapshot()
     if FINDINGS.exists():
         FINDINGS.unlink()
+    conn = db.connect()
+    try:
+        catalog = insights.catalog(conn)
+    finally:
+        conn.close()
     env = {**os.environ}
     env["PATH"] = os.pathsep.join([os.path.expanduser("~/.local/bin"), env.get("PATH", "")])
     proc = subprocess.run(
-        [str(CLAUDE), "-p", _prompt(), "--model", MODEL,
+        [str(CLAUDE), "-p", _prompt(catalog), "--model", MODEL,
          "--permission-mode", "bypassPermissions",
          "--allowedTools", "Bash,Read,Write,Edit,Glob,Grep"],
         cwd=str(LAB), env=env, capture_output=True, text=True, timeout=2400,

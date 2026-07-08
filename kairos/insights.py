@@ -55,8 +55,11 @@ def record_findings(conn, findings, run_date: str) -> dict:
                 (fid, f.get("title"), f.get("stat"), f.get("detail"), f.get("confidence"), ev,
                  f.get("since"), _now(), _now(), run_date, _now()))
     cutoff = (dt.date.fromisoformat(run_date) - dt.timedelta(days=STALE_DAYS)).isoformat()
+    # Reset seen_count on archival: a finding that goes stale must re-prove itself
+    # (candidate again, then GRADUATE_RUNS fresh sightings) before it re-activates,
+    # rather than jumping straight back to active on its first reappearance.
     conn.execute(
-        "UPDATE insights SET status='archived', updated_at=? "
+        "UPDATE insights SET status='archived', seen_count=0, updated_at=? "
         "WHERE status IN ('active','candidate') AND (last_run IS NULL OR last_run < ?)",
         (_now(), cutoff))
     conn.commit()
@@ -68,3 +71,12 @@ def active(conn) -> list:
         "SELECT id, title, stat, detail, since FROM insights WHERE status = 'active' "
         "ORDER BY COALESCE(confidence, 0) DESC, last_run DESC").fetchall()
     return [{"id": r[0], "title": r[1], "stat": r[2], "detail": r[3], "since": r[4]} for r in rows]
+
+
+def catalog(conn) -> list:
+    """Live findings (active + candidate) — fed to the Lab so it reuses existing
+    slugs for the same pattern instead of coining a new id each run (slug drift)."""
+    rows = conn.execute(
+        "SELECT id, title, status FROM insights WHERE status IN ('active', 'candidate') "
+        "ORDER BY status, id").fetchall()
+    return [{"id": r[0], "title": r[1], "status": r[2]} for r in rows]

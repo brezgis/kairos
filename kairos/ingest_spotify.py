@@ -20,7 +20,9 @@ def run() -> dict:
     plays = spotify.recently_played(limit=50)
     rows = []
     for it in plays:
-        t = it["track"]
+        t = it.get("track")
+        if not t:   # unavailable/removed tracks can come back null
+            continue
         rows.append((
             it["played_at"],
             t.get("id"),

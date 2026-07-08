@@ -16,7 +16,7 @@ import datetime as dt
 import json
 import statistics
 
-from . import db
+from . import db, insights
 
 # The detailed `sleep` endpoint, restricted to the main night, is the source of
 # truth for sleep durations + physiology (HRV, heart rate, breath). The
@@ -139,13 +139,9 @@ def daily_brief(conn, day: str | None = None) -> dict:
         ((n, f) for n, f in feats.items()
          if n not in DETERMINISTIC and isinstance(f, dict) and abs(f.get("z30", 0)) >= 1.0),
         key=lambda kv: abs(kv[1]["z30"]), reverse=True)
-    active_insights = []
-    ins = conn.execute("SELECT value FROM app_state WHERE key='kairos:insights'").fetchone()
-    if ins:
-        try:
-            active_insights = json.loads(ins[0]).get("active", [])
-        except Exception:
-            pass
+    # The Lab's graduated findings live in the `insights` table (managed by the
+    # candidate→active→archived lifecycle), not the legacy app_state blob.
+    active_insights = insights.active(conn)
     return {
         "day": day,
         "streams_present": sorted(feats.keys()),
