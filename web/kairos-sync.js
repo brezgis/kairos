@@ -13,7 +13,7 @@
   }
 
   // Oracle bridge: provide window.claude.complete so the app's generateOracle()
-  // routes through the Kairos backend (agent-generate: Claude Code -> Qwopus).
+  // routes through the Kairos backend (agent-generate: Claude Code -> local LLM).
   if (!window.claude) window.claude = {};
   if (!window.claude.complete) {
     window.claude.complete = function (prompt) {

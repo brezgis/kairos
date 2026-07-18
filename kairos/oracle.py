@@ -5,9 +5,10 @@ Voice: warm, wry, a little mystical/knowing — a fortune-teller × gossipy-hair
 rolling memory (oracle_memory.md), the Lab's active insights, and today's data, and
 it grounds every line in real numbers.
 
-Reuses `~/.local/bin/agent-generate` (headless Claude Code → local Qwopus fallback).
-Output is Markdown (# Title + paragraph), preserved/validated by normalize-letter and
-parsed into title/text. Generation runs in the BACKGROUND; the frontend polls.
+Delegates generation to an external `~/.local/bin/agent-generate` helper
+(headless Claude Code → local LLM fallback). Output is Markdown (# Title +
+paragraph), parsed into title/text. Generation runs in the BACKGROUND; the
+frontend polls.
 """
 
 from __future__ import annotations
@@ -138,7 +139,7 @@ def _prompt(brief: dict, morning: dict, bio: str, memory: str, out_path: str) ->
         "<the reading: ONE flowing paragraph, ~70-100 words — no lists, no extra headings, no preamble>\n\n"
         f"Write that (the # title line, a blank line, then the paragraph) to this exact file:\n  {out_path}\n\n"
         f"Then, using your file tools, APPEND 1-2 terse dated lines to {MEMORY_PATH} — anything worth "
-        "remembering for next time (a theme forming, something she logged, a callback). Only append; do not "
+        "remembering for next time (a theme forming, something they logged, a callback). Only append; do not "
         "rewrite the file. Do not search the web or use any other tools."
     )
 

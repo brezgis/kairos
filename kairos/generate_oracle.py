@@ -4,7 +4,7 @@
     python3 -m kairos.generate_oracle --day 2026-06-17
 
 Runs after ingestion + the morning check-in so the reading reflects real data.
-Uses agent-generate (Claude Code primary, local Qwopus fallback).
+Uses the agent-generate helper (headless Claude Code primary, local LLM fallback).
 """
 
 from __future__ import annotations
